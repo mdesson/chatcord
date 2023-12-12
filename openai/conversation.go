@@ -81,6 +81,7 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 	}
 
 	chunks := make(chan string)
+	newMessage := Message{Role: ROLE_ASSISTANT, Content: ""}
 
 	go func() {
 		defer func() {
@@ -89,10 +90,11 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 			c.mu.Unlock()
 		}()
 
-		c.Messages = append(c.Messages, Message{})
 		scanner := bufio.NewScanner(chatResponse.HTTPBody)
 		for scanner.Scan() {
-			rawChunk := strings.TrimPrefix(scanner.Text(), "data: ")
+			newText := scanner.Text()
+			newMessage.Content += newText
+			rawChunk := strings.TrimPrefix(newText, "data: ")
 
 			if rawChunk == "" {
 				continue
@@ -118,6 +120,8 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 		if err := scanner.Err(); err != nil {
 			chunks <- err.Error()
 		}
+
+		c.Messages = append(c.Messages, newMessage)
 	}()
 
 	return chunks, nil

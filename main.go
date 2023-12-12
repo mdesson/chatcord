@@ -1,25 +1,30 @@
 package main
 
 import (
-	"fmt"
+	"github.com/mdesson/chatcord/discord"
 	openai "github.com/mdesson/chatcord/openai"
 )
 
 func main() {
-	client, err := openai.NewClient(openai.GPT_4_TURBO)
+	openAIClient, err := openai.NewClient(openai.GPT_4_TURBO)
 	if err != nil {
 		panic(err)
 	}
 
 	systemPrompt := "You're a helpful assistant that loves to say Hello World! as much as humanly possible."
-	conversation := openai.NewConversation(openai.GPT_4_TURBO, systemPrompt, client)
+	conversation := openai.NewConversation(openai.GPT_4_TURBO, systemPrompt, openAIClient)
 
-	chunks, err := conversation.ChatStream("What's the best phrase in the world and why!")
+	chunks, err := conversation.ChatStream("What are the five best things about Montreal? Your response must be at least 2001 characters.")
 	if err != nil {
 		panic(err)
 	}
 
-	for chunk := range chunks {
-		fmt.Printf("%s", chunk)
+	discordClient, err := discord.NewClient(500)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := discordClient.StreamMessage(chunks, "1183176110150791179"); err != nil {
+		panic(err)
 	}
 }
