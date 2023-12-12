@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	openAIClient, err := openai.NewClient(openai.GPT_4_TURBO)
+	openAIClient, err := openai.NewClient()
 	if err != nil {
 		panic(err)
 	}
