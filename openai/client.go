@@ -13,7 +13,7 @@ type Client struct {
 	apiToken string
 }
 
-func NewClient(model Model) (*Client, error) {
+func NewClient() (*Client, error) {
 	// Get API token from environment variable, return error if it's not set
 	apiToken := os.Getenv("OPENAI_TOKEN")
 	if apiToken == "" {
