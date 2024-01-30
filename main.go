@@ -1,30 +1,28 @@
 package main
 
 import (
-	"github.com/mdesson/chatcord/discord"
-	openai "github.com/mdesson/chatcord/openai"
+	"fmt"
+	"github.com/mdesson/chatcord/bot"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
-	openAIClient, err := openai.NewClient()
+	b, err := bot.New(slog.LevelDebug)
 	if err != nil {
 		panic(err)
 	}
-
-	systemPrompt := "You're a helpful assistant that loves to say Hello World! as much as humanly possible."
-	conversation := openai.NewConversation(openai.GPT_4_TURBO, systemPrompt, openAIClient)
-
-	chunks, err := conversation.ChatStream("What are the five best things about Montreal? Your response must be at least 2001 characters.")
-	if err != nil {
+	if err := b.Start(); err != nil {
 		panic(err)
 	}
 
-	discordClient, err := discord.NewClient(500)
-	if err != nil {
-		panic(err)
-	}
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
-	if err := discordClient.StreamMessage(chunks, "1183176110150791179"); err != nil {
-		panic(err)
+	select {
+	case <-sc:
+		fmt.Println("\nExiting...")
 	}
 }

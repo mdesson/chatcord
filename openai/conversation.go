@@ -14,7 +14,7 @@ type Conversation struct {
 	Temperature  *float64
 	TotalChoices int
 	SystemPrompt string
-	Usage        Usage // Will be zeroed out for streaming conversations
+	Usage        Usage // Will be zeroed out for streaming conversations, as it is not returned, TODO: Is there an OpenAI endpoint to count tokens in a conversation? Do it myself?
 	client       *Client
 	mu           sync.Mutex
 }
@@ -65,7 +65,7 @@ func (c *Conversation) Chat(message string) (string, error) {
 	return chatResponse.Choices[0].Message.Content, nil
 }
 
-func (c *Conversation) ChatStream(message string) (chan string, error) {
+func (c *Conversation) ChatStream(message string) (chan string, chan error, error) {
 	c.mu.Lock()
 
 	c.Messages = append(c.Messages, Message{Role: ROLE_USER, Content: message})
@@ -77,16 +77,18 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 		TotalChoices: c.TotalChoices,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	chunks := make(chan string)
+	errChan := make(chan error)
 	newMessage := Message{Role: ROLE_ASSISTANT, Content: ""}
 
 	go func() {
 		defer func() {
 			_ = chatResponse.HTTPBody.Close()
 			close(chunks)
+			close(errChan)
 			c.mu.Unlock()
 		}()
 
@@ -102,8 +104,7 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 
 			var chunk Chunk
 			if err := json.Unmarshal([]byte(rawChunk), &chunk); err != nil {
-				// TODO: Gracefully handle error once logging is set up
-				chunks <- err.Error()
+				errChan <- err
 				break
 			}
 
@@ -116,13 +117,12 @@ func (c *Conversation) ChatStream(message string) (chan string, error) {
 			chunks <- text
 		}
 
-		// TODO: Log errors once proper logging is set up
 		if err := scanner.Err(); err != nil {
-			chunks <- err.Error()
+			errChan <- err
 		}
 
 		c.Messages = append(c.Messages, newMessage)
 	}()
 
-	return chunks, nil
+	return chunks, errChan, nil
 }

@@ -9,8 +9,9 @@ import (
 
 type Client struct {
 	apiToken          string
-	session           *discordgo.Session
+	Session           *discordgo.Session
 	streamBatchWaitMs int64
+	GeneralChannel    string
 }
 
 func NewClient(streamBatchWaitMs int64) (*Client, error) {
@@ -20,35 +21,38 @@ func NewClient(streamBatchWaitMs int64) (*Client, error) {
 		return nil, fmt.Errorf("DISCORD_API_TOKEN environment variable not set")
 	}
 
+	// TODO: Find general general channel on start, add env var to optionally pass name or id for it
+	generalChannel := os.Getenv("GENERAL_CHANNEL_ID")
+	if generalChannel == "" {
+		return nil, fmt.Errorf("GENERAL_CHANNEL_ID environment variable not set")
+	}
+
 	session, err := discordgo.New("Bot " + apiToken)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{session: session, apiToken: apiToken, streamBatchWaitMs: streamBatchWaitMs}, nil
+	return &Client{Session: session, apiToken: apiToken, streamBatchWaitMs: streamBatchWaitMs, GeneralChannel: generalChannel}, nil
 }
 
 func (c *Client) SendMessage(message string, channelID string) error {
 	// set typing
-	if err := c.session.ChannelTyping(channelID); err != nil {
+	if err := c.Session.ChannelTyping(channelID); err != nil {
 		return err
 	}
-	defer func(session *discordgo.Session, channelID string, options ...discordgo.RequestOption) {
-		_ = session.ChannelTyping(channelID)
-	}(c.session, channelID)
 
-	_, err := c.session.ChannelMessageSend(channelID, message)
+	_, err := c.Session.ChannelMessageSend(channelID, message)
 	return err
 }
 
 func (c *Client) StreamMessage(chunks chan string, channelID string) error {
 	// set typing
-	if err := c.session.ChannelTyping(channelID); err != nil {
+	if err := c.Session.ChannelTyping(channelID); err != nil {
 		return err
 	}
 	defer func(session *discordgo.Session, channelID string, options ...discordgo.RequestOption) {
 		_ = session.ChannelTyping(channelID)
-	}(c.session, channelID)
+	}(c.Session, channelID)
 
 	// grab the first non-empty string off the channel to create the initial message
 	msgText := ""
@@ -59,7 +63,7 @@ func (c *Client) StreamMessage(chunks chan string, channelID string) error {
 		}
 	}
 
-	msg, err := c.session.ChannelMessageSend(channelID, msgText)
+	msg, err := c.Session.ChannelMessageSend(channelID, msgText)
 	if err != nil {
 		return err
 	}
@@ -72,10 +76,10 @@ func (c *Client) StreamMessage(chunks chan string, channelID string) error {
 			if !ok {
 				if buff != "" {
 					if len(msgText)+len(buff) > 2000 {
-						if _, err := c.session.ChannelMessageSend(channelID, buff); err != nil {
+						if _, err := c.Session.ChannelMessageSend(channelID, buff); err != nil {
 							return err
 						} else {
-							if _, err := c.session.ChannelMessageEdit(channelID, msg.ID, msgText+buff); err != nil {
+							if _, err := c.Session.ChannelMessageEdit(channelID, msg.ID, msgText+buff); err != nil {
 								return err
 							}
 						}
@@ -87,13 +91,13 @@ func (c *Client) StreamMessage(chunks chan string, channelID string) error {
 		case <-ticker.C:
 			if len(msgText)+len(buff) > 2000 {
 				msgText = buff
-				msg, err = c.session.ChannelMessageSend(channelID, msgText)
+				msg, err = c.Session.ChannelMessageSend(channelID, msgText)
 				if err != nil {
 					return err
 				}
 			} else {
 				msgText += buff
-				if _, err := c.session.ChannelMessageEdit(channelID, msg.ID, msgText); err != nil {
+				if _, err := c.Session.ChannelMessageEdit(channelID, msg.ID, msgText); err != nil {
 					return err
 				}
 			}
