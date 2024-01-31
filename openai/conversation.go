@@ -24,7 +24,7 @@ func NewConversation(model Model, systemPrompt string, client *Client) *Conversa
 		Name:  "temp", // TODO: Conversation name generation
 		Model: model,
 		Messages: []Message{
-			{Role: ROLE_SYSTEM, Content: systemPrompt},
+			{Index: 1, Role: ROLE_SYSTEM, Content: systemPrompt},
 		},
 		Temperature:  nil,
 		TotalChoices: 1,
@@ -53,7 +53,7 @@ func (c *Conversation) Chat(message string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Messages = append(c.Messages, Message{Role: ROLE_USER, Content: message})
+	c.Messages = append(c.Messages, Message{Index: len(c.Messages) + 1, Role: ROLE_USER, Content: message})
 	chatResponse, err := c.client.sendChat(ChatRequest{
 		Model:        c.Model,
 		Messages:     c.Messages,
@@ -65,7 +65,10 @@ func (c *Conversation) Chat(message string) (string, error) {
 		return "", err
 	}
 
-	c.Messages = append(c.Messages, chatResponse.Choices[0].Message)
+	msg := chatResponse.Choices[0].Message
+	msg.Index = len(c.Messages) + 1
+
+	c.Messages = append(c.Messages, msg)
 	c.Usage = chatResponse.Usage
 	return chatResponse.Choices[0].Message.Content, nil
 }

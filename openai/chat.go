@@ -5,6 +5,7 @@ import (
 )
 
 type Message struct {
+	Index   int    `json:"-"`
 	Role    Role   `json:"role"`
 	Content string `json:"content"`
 }

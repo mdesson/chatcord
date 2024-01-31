@@ -24,10 +24,12 @@ func initDB() (*sql.DB, error) {
         system_prompt TEXT
     );
     CREATE TABLE IF NOT EXISTS messages (
+        idx INTEGER NOT NULL,
         channel_id TEXT,
         role TEXT,
         content TEXT,
-        FOREIGN KEY (channel_id) REFERENCES conversations (channel_id)
+        FOREIGN KEY (channel_id) REFERENCES conversations (channel_id),
+        UNIQUE (idx, channel_id)
     );
     CREATE TABLE IF NOT EXISTS usages (
         channel_id TEXT PRIMARY KEY,
@@ -45,7 +47,8 @@ func initDB() (*sql.DB, error) {
 	return db, nil
 }
 
-func insertConversation(b Bot, conv conversation) (err error) {
+// createConvoMessageUsage initializes a new conversation. It creates the db entry for the conversation, the initial message (the system message), and the usage
+func createConvoMessageUsage(b Bot, conv conversation) (err error) {
 	tx, err := b.db.Begin()
 	if err != nil {
 		return err
@@ -63,8 +66,8 @@ func insertConversation(b Bot, conv conversation) (err error) {
 	// Insert into messages table
 	for _, msg := range conv.Messages {
 		_, err = tx.Exec(
-			"INSERT INTO messages(channel_id, role, content) VALUES(?, ?, ?)",
-			conv.ChannelID, msg.Role, msg.Content,
+			"INSERT INTO messages(idx, channel_id, role, content) VALUES(?, ?, ?, ?)",
+			msg.Index, conv.ChannelID, msg.Role, msg.Content,
 		)
 		if err != nil {
 			tx.Rollback()
@@ -125,14 +128,14 @@ func selectAllConversations(b Bot) ([]conversation, error) {
 }
 
 func insertMessage(b Bot, channelID string, m openai.Message) error {
-	if _, err := b.db.Exec(`INSERT INTO messages(channel_id, role, content) VALUES (?, ?, ?)`, channelID, m.Role, m.Content); err != nil {
+	if _, err := b.db.Exec(`INSERT INTO messages(idx, channel_id, role, content) VALUES (?, ?, ?, ?)`, m.Index, channelID, m.Role, m.Content); err != nil {
 		return err
 	}
 	return nil
 }
 
 func selectMessagesByChannelID(b Bot, channelID string) ([]openai.Message, error) {
-	msgRes, err := b.db.Query(`SELECT * FROM messages WHERE channel_id = ?`, channelID)
+	msgRes, err := b.db.Query(`SELECT * FROM messages WHERE channel_id = ? ORDER BY idx ASC`, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +147,7 @@ func selectMessagesByChannelID(b Bot, channelID string) ([]openai.Message, error
 			openai.Message
 		}{}
 
-		if err := msgRes.Scan(&msg.ChannelID, &msg.Role, &msg.Content); err != nil {
+		if err := msgRes.Scan(&msg.Index, &msg.ChannelID, &msg.Role, &msg.Content); err != nil {
 			return nil, err
 		}
 		msgs = append(msgs, msg.Message)

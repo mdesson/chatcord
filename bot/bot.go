@@ -67,7 +67,7 @@ func (b *Bot) Start() error {
 			Conversation: openai.NewConversation(openai.GPT_4_TURBO, "You are a helpful assistant. If you need to use formatting, send it with discord-flavoured markdown.", b.openAIClient),
 		}
 
-		if err := insertConversation(*b, c); err != nil {
+		if err := createConvoMessageUsage(*b, c); err != nil {
 			b.l.Error(err.Error())
 			return
 		}
@@ -100,30 +100,33 @@ func (b *Bot) Start() error {
 						}
 					}
 				}()
-				defer func() { done <- true }()
 
 				if msg, err := c.Chat(event.Content); err != nil {
+					done <- true
 					b.l.Error(err.Error(), "channel_id", event.ChannelID)
 				} else {
+					done <- true
 					for _, chunk := range util.ChunkText(msg) {
 						if err := b.discordClient.SendMessage(chunk, event.ChannelID); err != nil {
 							b.l.Error(err.Error(), "channel_id", event.ChannelID)
 						}
 					}
 					// After successfully sending message, update db with user message and bot response
-					// TODO: This should really be done as a transaction
-					if err := insertMessage(*b, event.ChannelID, openai.Message{Role: openai.ROLE_USER, Content: event.Content}); err != nil {
+					// TODO: This should really be done as a transaction.
+					userMsg := c.Messages[len(c.Messages)-2]
+					botMsg := c.Messages[len(c.Messages)-1]
+
+					if err := insertMessage(*b, event.ChannelID, userMsg); err != nil {
 						b.l.Error(err.Error(), "channel_id", event.ChannelID)
 					}
 
-					if err := insertMessage(*b, event.ChannelID, openai.Message{Role: openai.ROLE_ASSISTANT, Content: msg}); err != nil {
+					if err := insertMessage(*b, event.ChannelID, botMsg); err != nil {
 						b.l.Error(err.Error(), "channel_id", event.ChannelID)
 					}
 
 					if err := updateUsage(*b, event.ChannelID, c.Usage); err != nil {
 						b.l.Error(err.Error(), "channel_id", event.ChannelID)
 					}
-
 				}
 				break
 			}
