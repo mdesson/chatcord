@@ -38,6 +38,11 @@ func NewConversation(model Model, systemPrompt string, client *Client) *Conversa
 	}
 }
 
+func (c *Conversation) Init(client *Client) {
+	c.mu = sync.Mutex{}
+	c.client = client
+}
+
 func (c *Conversation) UpdatePrompt(prompt string) {
 	c.Messages[0].Content = prompt
 	c.SystemPrompt = prompt

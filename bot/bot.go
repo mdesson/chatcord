@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"database/sql"
 	"github.com/bwmarrin/discordgo"
 	"github.com/mdesson/chatcord/discord"
 	"github.com/mdesson/chatcord/logger"
@@ -11,14 +12,15 @@ import (
 )
 
 type conversation struct {
-	channelID   string
-	openAIConvo *openai.Conversation
+	ChannelID string
+	*openai.Conversation
 }
 
 type Bot struct {
 	conversations []*conversation
 	discordClient *discord.Client
 	openAIClient  *openai.Client
+	db            *sql.DB
 	l             *logger.Logger
 }
 
@@ -34,7 +36,23 @@ func New(logLevel slog.Level) (*Bot, error) {
 		return nil, err
 	}
 
-	return &Bot{conversations: make([]*conversation, 0), discordClient: discordClient, openAIClient: openAIClient, l: logger.New(logLevel)}, nil
+	db, err := initDB()
+	if err != nil {
+		return nil, err
+	}
+
+	b := &Bot{conversations: make([]*conversation, 0), discordClient: discordClient, openAIClient: openAIClient, db: db, l: logger.New(logLevel)}
+
+	conversations, err := selectAllConversations(*b)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range conversations {
+		c := c
+		b.conversations = append(b.conversations, &c)
+	}
+
+	return b, nil
 }
 
 // Start registers discord handlers and then starts the discord session
@@ -45,9 +63,15 @@ func (b *Bot) Start() error {
 	b.discordClient.Session.AddHandler(func(s *discordgo.Session, event *discordgo.ChannelCreate) {
 		// TODO: Use a system default prompt.
 		c := conversation{
-			channelID:   event.Channel.ID,
-			openAIConvo: openai.NewConversation(openai.GPT_4_TURBO, "You are a helpful assistant. If you need to use formatting, send it with discord-flavoured markdown.", b.openAIClient),
+			ChannelID:    event.Channel.ID,
+			Conversation: openai.NewConversation(openai.GPT_4_TURBO, "You are a helpful assistant. If you need to use formatting, send it with discord-flavoured markdown.", b.openAIClient),
 		}
+
+		if err := insertConversation(*b, c); err != nil {
+			b.l.Error(err.Error())
+			return
+		}
+
 		b.conversations = append(b.conversations, &c)
 	})
 
@@ -59,8 +83,8 @@ func (b *Bot) Start() error {
 		}
 
 		for _, c := range b.conversations {
-			done := make(chan bool, 0)
-			if event.ChannelID == c.channelID {
+			done := make(chan bool)
+			if event.ChannelID == c.ChannelID {
 				// Set typing while openAI processes API request
 				go func() {
 					for {
@@ -78,7 +102,7 @@ func (b *Bot) Start() error {
 				}()
 				defer func() { done <- true }()
 
-				if msg, err := c.openAIConvo.Chat(event.Content); err != nil {
+				if msg, err := c.Chat(event.Content); err != nil {
 					b.l.Error(err.Error(), "channel_id", event.ChannelID)
 				} else {
 					for _, chunk := range util.ChunkText(msg) {
@@ -86,6 +110,20 @@ func (b *Bot) Start() error {
 							b.l.Error(err.Error(), "channel_id", event.ChannelID)
 						}
 					}
+					// After successfully sending message, update db with user message and bot response
+					// TODO: This should really be done as a transaction
+					if err := insertMessage(*b, event.ChannelID, openai.Message{Role: openai.ROLE_USER, Content: event.Content}); err != nil {
+						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+					}
+
+					if err := insertMessage(*b, event.ChannelID, openai.Message{Role: openai.ROLE_ASSISTANT, Content: msg}); err != nil {
+						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+					}
+
+					if err := updateUsage(*b, event.ChannelID, c.Usage); err != nil {
+						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+					}
+
 				}
 				break
 			}
@@ -105,4 +143,17 @@ func (b *Bot) Start() error {
 	b.l.Info("bot init complete")
 
 	return nil
+}
+
+func (b *Bot) Stop() {
+	b.l.Info("stopping")
+
+	if err := b.db.Close(); err != nil {
+		b.l.Error(err.Error())
+	}
+	if err := b.discordClient.Session.Close(); err != nil {
+		b.l.Error(err.Error())
+	}
+
+	b.l.Info("stopped")
 }

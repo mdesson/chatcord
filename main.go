@@ -17,6 +17,7 @@ func main() {
 	if err := b.Start(); err != nil {
 		panic(err)
 	}
+	defer b.Stop()
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
