@@ -89,6 +89,40 @@ func createConvoMessageUsage(b Bot, conv conversation) (err error) {
 	return err
 }
 
+// deleteConvoMessageUsage deletes the conversation, all messages, and the usage given a conversation ID
+func deleteConvoMessageUsage(b Bot, channelID string) (err error) {
+	tx, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// Delete usage
+	if _, err := tx.Exec("DELETE FROM usages WHERE channel_id = ?", channelID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Delete messages
+	if _, err := tx.Exec("DELETE FROM messages WHERE channel_id = ?", channelID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Finally, delete converations
+	if _, err := tx.Exec("DELETE FROM conversations WHERE channel_id = ?", channelID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	return err
+}
+
 func selectAllConversations(b Bot) ([]conversation, error) {
 	convoRes, err := b.db.Query(`SELECT * FROM conversations`)
 	if err != nil {
