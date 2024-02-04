@@ -9,6 +9,8 @@ import (
 
 func MakeChannelCreateHandler(b *Bot) func(s *discordgo.Session, event *discordgo.ChannelCreate) {
 	return func(s *discordgo.Session, event *discordgo.ChannelCreate) {
+		b.l.Debug("called", "channel_id", event.ID, "handler", "channel_create")
+
 		// TODO: Use a system default prompt.
 		c := conversation{
 			ChannelID:    event.Channel.ID,
@@ -26,6 +28,8 @@ func MakeChannelCreateHandler(b *Bot) func(s *discordgo.Session, event *discordg
 
 func MakeMessageCreateHandler(b *Bot) func(s *discordgo.Session, event *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, event *discordgo.MessageCreate) {
+		b.l.Debug("called", "channel_id", event, "handler", "message_create")
+		
 		// Ignore messages sent by the bot
 		if event.Author.Bot {
 			return
@@ -87,6 +91,8 @@ func MakeMessageCreateHandler(b *Bot) func(s *discordgo.Session, event *discordg
 
 func MakeChannelDeleteHandler(b *Bot) func(s *discordgo.Session, event *discordgo.ChannelDelete) {
 	return func(s *discordgo.Session, event *discordgo.ChannelDelete) {
+		b.l.Debug("called", "channel_id", event, "handler", "channel_delete")
+
 		// Remove from database
 		if err := deleteConvoMessageUsage(*b, event.ID); err != nil {
 			b.l.Error(err.Error(), "handler", "channel_delete", "channel_id", event.ID)
