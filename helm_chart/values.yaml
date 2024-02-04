@@ -1,0 +1,27 @@
+appName: chatcord
+namespace: chatcord
+deploy:
+  metadata:
+    name: "chatcord-deploy"
+  replicas: 1
+  spec:
+    containers:
+      image:
+        repo: mdesson/chatcord
+        tag: v0.1.0
+    env:
+      OPENAI_TOKEN: ${OPENAI_TOKEN}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      GENERAL_CHANNEL_ID: ${GENERAL_CHANNEL_ID}
+    volumeMounts:
+      mountPath: "/root"
+    volumes:
+      name: "chatcord-storage"
+pvc:
+  metadata:
+    name: "chatcord-pvc"
+  spec:
+    accessMode: ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi

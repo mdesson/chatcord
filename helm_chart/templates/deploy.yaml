@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deploy.metadata.name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  replicas: {{ .Values.deploy.replicas }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      containers:
+        - name: {{ .Values.appName }}
+          image: {{ .Values.deploy.spec.containers.image.repo }}:{{ .Values.deploy.spec.containers.image.tag }}
+          ports:
+            - containerPort: {{ .Values.deploy.spec.ports.containerPort }}
+          env:
+            - name: OPENAI_TOKEN
+              value: "{{ .Values.deploy.spec.env.OPENAI_TOKEN }}"
+            - name: DISCORD_BOT_TOKEN
+              value: "{{ .Values.deploy.spec.env.DISCORD_BOT_TOKEN }}"
+            - name: GENERAL_CHANNEL_ID
+              value: "{{ .Values.deploy.spec.env.GENERAL_CHANNEL_ID }}"
+          volumeMounts:
+            - mountPath: {{ .Values.deploy.spec.volumeMounts.mountPath }}
+              name: {{ .Values.deploy.spec.volumes.name }}
+      volumes:
+        - name: {{ .Values.deploy.spec.volumes.name }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.metadata.name }}
