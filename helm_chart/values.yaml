@@ -8,13 +8,13 @@ deploy:
     containers:
       image:
         repo: mdesson/chatcord
-        tag: v0.1.1
+        tag: v0.1.2
     env:
       OPENAI_TOKEN: ${OPENAI_TOKEN}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       GENERAL_CHANNEL_ID: ${GENERAL_CHANNEL_ID}
     volumeMounts:
-      mountPath: "/root"
+      mountPath: "/chatcord/data"
     volumes:
       name: "chatcord-storage"
 pvc:

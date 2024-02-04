@@ -20,5 +20,6 @@
 # Go workspace file
 go.work
 
-# local db 
+# local db and data
+data/
 *.db

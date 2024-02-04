@@ -13,7 +13,7 @@ RUN apt-get update && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root/
-COPY --from=builder /usr/src/chatcord/app /root/
+WORKDIR /chatcord
+COPY --from=builder /usr/src/chatcord/app /chatcord/
 
 CMD ["./app"]
