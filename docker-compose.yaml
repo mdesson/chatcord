@@ -1,0 +1,19 @@
+version: "3.7"
+services:
+  chatcord:
+    image: mdesson/chatcord:latest
+    container_name: chatcord
+    deploy:
+      resources:
+        limits:
+          memory: 1000M
+    environment:
+      - OPENAI_TOKEN=${OPENAI_TOKEN}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - GENERAL_CHANNEL_ID=${GENERAL_CHANNEL_ID}
+    volumes:
+      - chatcord-data:/root/
+    restart: unless-stopped
+volumes:
+  chatcord-data:
+    driver: local
