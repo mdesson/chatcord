@@ -11,6 +11,7 @@ type Client struct {
 	apiToken          string
 	Session           *discordgo.Session
 	streamBatchWaitMs int64
+	GuildID           string
 	GeneralChannel    string
 }
 
@@ -32,7 +33,13 @@ func NewClient(streamBatchWaitMs int64) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{Session: session, apiToken: apiToken, streamBatchWaitMs: streamBatchWaitMs, GeneralChannel: generalChannel}, nil
+	channel, err := session.Channel(generalChannel)
+	if err != nil {
+		return nil, err
+	}
+	guildID := channel.GuildID
+
+	return &Client{Session: session, apiToken: apiToken, streamBatchWaitMs: streamBatchWaitMs, GuildID: guildID, GeneralChannel: generalChannel}, nil
 }
 
 func (c *Client) SendMessage(message string, channelID string) error {

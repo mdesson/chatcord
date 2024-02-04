@@ -23,6 +23,7 @@ type Bot struct {
 
 // New creates a new bot, which has access to a discord client and an OpenAI client
 func New(logLevel slog.Level) (*Bot, error) {
+	// Initialize Clients
 	discordClient, err := discord.NewClient(500)
 	if err != nil {
 		return nil, err
@@ -38,6 +39,7 @@ func New(logLevel slog.Level) (*Bot, error) {
 		return nil, err
 	}
 
+	// init bot and add converations
 	b := &Bot{conversations: make(map[string]*conversation), discordClient: discordClient, openAIClient: openAIClient, db: db, l: logger.New(logLevel)}
 
 	conversations, err := selectAllConversations(*b)
@@ -48,6 +50,32 @@ func New(logLevel slog.Level) (*Bot, error) {
 		c := c
 		b.conversations[c.ChannelID] = &c
 	}
+
+	// prune converations for channels that no longer exist
+	channels, err := b.discordClient.Session.GuildChannels(b.discordClient.GuildID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Move entries form toDelete into toKeep as we discover them
+	toDelete := b.conversations
+	toKeep := make(map[string]*conversation)
+
+	for _, channel := range channels {
+		if convo, ok := toDelete[channel.ID]; ok {
+			toKeep[channel.ID] = convo
+			delete(toDelete, channel.ID)
+		}
+	}
+
+	// delete the remaining channels in toDelete & assign toKeep to bot
+	for channelID, _ := range toDelete {
+		if err := deleteConvoMessageUsage(*b, channelID); err != nil {
+			return nil, err
+		}
+	}
+
+	b.conversations = toKeep
 
 	return b, nil
 }
@@ -82,6 +110,10 @@ func (b *Bot) Start() error {
 
 func (b *Bot) Stop() {
 	b.l.Info("stopping")
+
+	if err := b.discordClient.SendMessage("going offline", b.discordClient.GeneralChannel); err != nil {
+		b.l.Error(err.Error())
+	}
 
 	if err := b.db.Close(); err != nil {
 		b.l.Error(err.Error())
