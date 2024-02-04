@@ -68,7 +68,7 @@ func (b *Bot) Start() error {
 		}
 
 		if err := createConvoMessageUsage(*b, c); err != nil {
-			b.l.Error(err.Error())
+			b.l.Error(err.Error(), "handler", "channel_create")
 			return
 		}
 
@@ -93,7 +93,7 @@ func (b *Bot) Start() error {
 							return
 						default:
 							if err := b.discordClient.Session.ChannelTyping(event.ChannelID); err != nil {
-								b.l.Error(err.Error(), "channel_id", event.ChannelID)
+								b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 								return
 							}
 							time.Sleep(3 * time.Second)
@@ -103,12 +103,12 @@ func (b *Bot) Start() error {
 
 				if msg, err := c.Chat(event.Content); err != nil {
 					done <- true
-					b.l.Error(err.Error(), "channel_id", event.ChannelID)
+					b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 				} else {
 					done <- true
 					for _, chunk := range util.ChunkText(msg) {
 						if err := b.discordClient.SendMessage(chunk, event.ChannelID); err != nil {
-							b.l.Error(err.Error(), "channel_id", event.ChannelID)
+							b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 						}
 					}
 					// After successfully sending message, update db with user message and bot response
@@ -117,15 +117,15 @@ func (b *Bot) Start() error {
 					botMsg := c.Messages[len(c.Messages)-1]
 
 					if err := insertMessage(*b, event.ChannelID, userMsg); err != nil {
-						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+						b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 					}
 
 					if err := insertMessage(*b, event.ChannelID, botMsg); err != nil {
-						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+						b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 					}
 
 					if err := updateUsage(*b, event.ChannelID, c.Usage); err != nil {
-						b.l.Error(err.Error(), "channel_id", event.ChannelID)
+						b.l.Error(err.Error(), "handler", "message_create", "channel_id", event.ChannelID)
 					}
 				}
 				break
