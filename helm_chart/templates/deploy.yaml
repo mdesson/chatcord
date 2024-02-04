@@ -15,8 +15,6 @@ spec:
       containers:
         - name: {{ .Values.appName }}
           image: {{ .Values.deploy.spec.containers.image.repo }}:{{ .Values.deploy.spec.containers.image.tag }}
-          ports:
-            - containerPort: {{ .Values.deploy.spec.ports.containerPort }}
           env:
             - name: OPENAI_TOKEN
               value: "{{ .Values.deploy.spec.env.OPENAI_TOKEN }}"
